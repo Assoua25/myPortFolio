@@ -1,0 +1,40 @@
+@import '@/app/_styles/index.css';
+@import '@/app/admin/admin.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary-clr: #1c2e82;
+  --primary-light-clr: #2a3d96;
+  --primary-dark-clr: #162469;
+  --secondary-clr: #f77f00;
+  --secondary-light-clr: #ff9419;
+  --secondary-dark-clr: #de7200;
+  --light-clr: #f6f8fc;
+  --destructive: #dc2626;
+  --background: #ffffff;
+  --foreground: #171717;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 3.9%;
+}
+
+*,
+*::after,
+*::before {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  box-sizing: inherit;
+  font-size: 75.2%;
+}
+
+body {
+  font-weight: 300;
+  font-family: var(--font-chillax);
+  font-size: 1.6rem;
+}

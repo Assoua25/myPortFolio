@@ -1,0 +1,126 @@
+name: CI/CD for ersys web
+
+on:
+  push:
+    branches:
+      - dev
+      - staging
+      - main
+
+jobs:
+
+# Build application
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [23]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache pnpm modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build ersys app
+        run: pnpm run build
+
+# Build docker image
+  docker:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || github.ref == 'refs/heads/dev' && 'staging'  || github.ref == 'refs/heads/staging' && 'development'}}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.CONTAINER_REGISTRY }}
+          username: ${{ secrets.DOCR_USERNAME }}
+          password: ${{ secrets.DOCR_TOKEN }}
+
+      - name: Build and push Docker image
+        run: |
+          TAG=$(
+          case ${{ github.ref }} in
+            refs/heads/main) echo "latest";;
+            refs/heads/staging) echo "staging";;
+            *) echo "dev";;
+          esac
+          )
+          docker build --no-cache -t ${{ vars.CONTAINER_REGISTRY }}/${{ vars.DO_REGISTRY_NAME }}/${{ vars.ERSYS_WEB_IMAGE_NAME }}:$TAG .
+          docker push ${{ vars.CONTAINER_REGISTRY }}/${{ vars.DO_REGISTRY_NAME}}/${{ vars.ERSYS_WEB_IMAGE_NAME }}:$TAG
+
+      - name: Copy docker-compose files to the server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ github.ref == 'refs/heads/main' && secrets.ERSYS_FRONTEND_HOST_PROD || github.ref == 'refs/heads/staging' && secrets.ERSYS_DEMO_HOST || secrets.ERSYS_DEMO_HOST}}
+          username: ${{ secrets.ERSYS_SSH_USERNAME }}
+          key: ${{ github.ref == 'refs/heads/main' && secrets.ERSYS_FRONTEND_SSH_KEY || github.ref == 'refs/heads/staging' && secrets.ERSYS_DEMO_SSH_KEY || secrets.ERSYS_DEMO_SSH_KEY }}
+          source: ${{ github.ref == 'refs/heads/main' && 'docker-compose.prod.yml' || github.ref == 'refs/heads/staging' && 'docker-compose.staging.yml' || 'docker-compose.dev.yml'}}
+          target: ${{github.ref == 'refs/heads/main' && '/app/web/prod' || github.ref == 'refs/heads/staging' && '/app/web/staging' || '/app/web/dev'}}
+
+# Deploy images to dockers
+  deploy:
+    needs: docker
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || github.ref == 'refs/heads/staging' && 'staging' || 'development' }}
+    steps:
+      
+      - name: Deploy to DigitalOcean
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ github.ref == 'refs/heads/main' && secrets.ERSYS_FRONTEND_HOST_PROD || github.ref == 'refs/heads/staging' && secrets.ERSYS_DEMO_HOST || secrets.ERSYS_DEMO_HOST }}
+          username: ${{ secrets.ERSYS_SSH_USERNAME }}
+          key: ${{ github.ref == 'refs/heads/main' && secrets.ERSYS_FRONTEND_SSH_KEY || github.ref == 'refs/heads/staging' && secrets.ERSYS_DEMO_SSH_KEY || secrets.ERSYS_DEMO_SSH_KEY }}
+          script: |
+            ENV_DIR=${{
+              github.ref == 'refs/heads/main' && 'prod' ||
+              github.ref == 'refs/heads/staging' && 'staging' ||
+              'dev'
+            }}
+            IMAGE_TAG=${{
+              github.ref == 'refs/heads/main' && 'latest' ||
+              github.ref == 'refs/heads/staging' && 'staging' ||
+              'dev'
+            }}
+            cd /app/web/$ENV_DIR
+
+            echo "Logging into Docker..."
+            echo ${{ secrets.DOCR_TOKEN }} | docker login ${{ vars.CONTAINER_REGISTRY }}  -u ${{ secrets.DOCR_USERNAME }} --password-stdin
+
+            echo "Cleaning up old containers..."
+            docker system prune -af
+            docker volume prune -f
+
+            echo "Pulling the latest image..."
+            docker image rm -f ${{ vars.CONTAINER_REGISTRY }}/${{ vars.DO_REGISTRY_NAME }}/${{ vars.ERSYS_WEB_IMAGE_NAME }}:$IMAGE_TAG || true
+            docker pull ${{ vars.CONTAINER_REGISTRY }}/${{ vars.DO_REGISTRY_NAME }}/${{ vars.ERSYS_WEB_IMAGE_NAME }}:$IMAGE_TAG
+
+            echo "Stopping and removing old containers..."
+            docker compose -p ersys_web_$ENV_DIR -f docker-compose.$ENV_DIR.yml down --remove-orphans
+            
+            echo "Starting new containers..."
+            docker compose -p ersys_web_$ENV_DIR --env-file /opt/env/web/.env.$ENV_DIR  -f docker-compose.$ENV_DIR.yml up -d --remove-orphans --force-recreate
+            echo "Deployment complete."
