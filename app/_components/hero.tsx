@@ -2,92 +2,51 @@
 
 import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { ArrowRight, Badge } from 'lucide-react'
 // import { scrollToElement } from '@/lib/utils'
 
 export function Hero() {
-  // Tableau des images à afficher
-  const images = [
-    '/LOGO_ACT-removebg-preview.png',
-    '/work1.png',
-    '/work2.png',
-    '/work3.png',
-    '/work4.png'
-  ]
-
-  // État pour suivre l'index de l'image actuellement affichée
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-
-  // Utiliser useEffect pour changer l'image toutes les 5 secondes
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      setCurrentImageIndex(prevIndex => (prevIndex + 1) % images.length)
-    }, 5000) // 5000 ms = 10 secondes
-
-    // Nettoyage de l'intervalle lorsque le composant est démonté
-    return () => clearInterval(intervalId)
-  }, [])
-
-  const scrollToElement = (elementId: string) => {
-    const element = document.getElementById(elementId)
-    if (element) {
-      element.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-      })
-    }
-  }
+  
 
   return (
     <div className='from-primary/5 to-secondary/5 mb-20 mt-10 bg-gradient-to-br pb-16 pt-16'>
-      <div className='container mx-auto px-4'>
-        <div className='flex flex-col items-center gap-12 md:flex-row'>
-          <div className='flex-1 space-y-6'>
-            <h1 className='text-4xl font-bold leading-tight text-gray-900 md:text-5xl'>
-              <a href='#' className='-m-1.5 p-1.5'>
-                <Image
-                  alt='ERSYS'
-                  src='/LOGO_ERSYS_PRIMARY.png'
-                  width={1500}
-                  height={789}
-                  className='h-[50%] w-[50%]'
-                />
-              </a>
-              Bienvenue sur <span className='text-primary'>ERSYS</span>
-            </h1>
-            <p className='text-xl text-gray-600'>
-              Plateforme des services dématérialisés du ministère de l{`'`}
-              Enseignement Technique, de La Formation Professionnelle et de l
-              {`'`}Apprentissage.
-            </p>
-            <div className='flex flex-wrap gap-4'>
-              <button
-                className='rounded-lg bg-primary px-6 py-3 text-white transition-colors hover:bg-primary-dark'
-                onClick={() => scrollToElement('activity')}
-              >
-                Explorer nos services en ligne
-              </button>
-              <a
-                href='#'
-                target='_blank'
-                rel='noopener noreferrer'
-                className='hover:bg-secondary/5 rounded-lg border-2 border-secondary px-6 py-3 text-secondary transition-colors'
-              >
-                Calendrier des activités
-              </a>
+      <section className="container py-12 md:py-24 space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            <div className="space-y-6">
+              <div>
+                <Badge className="mb-4">Disponible pour des opportunités</Badge>
+                <h1 className="text-3xl md:text-5xl font-bold">
+                  Développeur <span className="text-primary">Next.js</span> Intermédiaire
+                </h1>
+              </div>
+              <p className="text-xl text-muted-foreground">
+                Passionné par la création d'applications web modernes et performantes avec React et Next.js.
+              </p>
+              <div className="flex gap-4">
+                <Link href="#projects">
+                  <Button size="lg">
+                    Voir mes projets
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link href="#contact">
+                  <Button size="lg" variant="outline">
+                    Me contacter
+                  </Button>
+                </Link>
+              </div>
             </div>
-          </div>
-          <div className='max-w-lg flex-1'>
-            <div className='aspect-square w-full transition-opacity'>
-              <Image
-                alt='ERSYS'
-                src={images[currentImageIndex]} // Affiche l'image actuelle
-                width={1499}
-                height={1469}
+            <div className="rounded-full overflow-hidden border aspect-square bg-muted max-w-[300px] mx-auto">
+              <img
+                src="/placeholder.svg?height=300&width=300"
+                alt="Portrait du développeur"
+                className="w-full h-full object-cover"
               />
             </div>
           </div>
-        </div>
-      </div>
+        </section>
     </div>
   )
 }
